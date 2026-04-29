@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<body style="background:#000; color:#fff; text-align:center; font-family:sans-serif;">
+
+    <div id="setup">
+        <button onclick="showMobile()" style="padding:20px;">I AM MOBILE</button>
+        <button onclick="showTV()" style="padding:20px;">I AM TV</button>
+    </div>
+
+    <div id="mobile" style="display:none;">
+        <input type="file" id="vid">
+        <button onclick="upload()">UPLOAD & GET CODE</button>
+        <h2 id="outCode"></h2>
+    </div>
+
+    <div id="tv" style="display:none;">
+        <input type="text" id="inCode" placeholder="Enter Code">
+        <button onclick="play()">WATCH</button>
+        <video id="v" controls width="100%"></video>
+    </div>
+
+    <script>
+        function showMobile() { document.getElementById('setup').style.display='none'; document.getElementById('mobile').style.display='block'; }
+        function showTV() { document.getElementById('setup').style.display='none'; document.getElementById('tv').style.display='block'; }
+
+        async function upload() {
+            const file = document.getElementById('vid').files[0];
+            const formData = new FormData();
+            formData.append('video', file);
+            const res = await fetch('/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            document.getElementById('outCode').innerText = "TV CODE: " + data.code;
+        }
+
+        function play() {
+            const code = document.getElementById('inCode').value;
+            document.getElementById('v').src = '/stream/' + code;
+        }
+    </script>
+</body>
+</html>
