@@ -5,13 +5,9 @@
     <style>
         body { background:#121212; color:#fff; text-align:center; font-family:sans-serif; padding: 20px; }
         button { padding:15px 20px; margin: 10px; font-size: 18px; background: #00d1ff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        input { padding: 10px; font-size: 16px; margin: 10px; text-align: center; }
-        video { width: 100%; max-width: 800px; margin-top: 20px; border: 2px solid #333; }
-        
-        /* Progress Bar Styles */
-        #progress-container { display: none; width: 80%; margin: 20px auto; background: #333; border-radius: 10px; overflow: hidden; }
-        #progress-bar { width: 0%; height: 25px; background: #00d1ff; transition: width 0.2s; }
-        #status-text { margin-top: 10px; font-size: 16px; color: #aaa; }
+        input { padding: 15px; font-size: 16px; margin: 10px; width: 80%; max-width: 400px; text-align: center; border-radius: 5px; border: none; }
+        video { width: 100%; max-width: 800px; margin-top: 20px; border: 2px solid #333; background: #000; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
@@ -22,91 +18,60 @@
         <button onclick="showTV()">I AM TV</button>
     </div>
 
-    <div id="mobile" style="display:none;">
-        <h2>Sender</h2>
-        <input type="file" id="vid" accept="video/*">
+    <div id="mobile" class="hidden">
+        <h2>Paste TeraBox Link</h2>
+        <input type="text" id="video-url" placeholder="https://terabox...">
         <br>
-        <button onclick="uploadVideo()">UPLOAD & GET CODE</button>
-        
-        <div id="progress-container">
-            <div id="progress-bar"></div>
-        </div>
-        <p id="status-text"></p>
-        
-        <h1 id="outCode" style="color: #00d1ff; font-size: 40px;"></h1>
+        <button onclick="sendLink()">CAST LINK</button>
+        <h1 id="outCode" style="color: #00ff88; font-size: 40px;"></h1>
     </div>
 
-    <div id="tv" style="display:none;">
-        <h2>Receiver</h2>
-        <input type="text" id="inCode" placeholder="Enter 4-Digit Code">
+    <div id="tv" class="hidden">
+        <h2>Enter TV Code</h2>
+        <input type="text" id="inCode" placeholder="4-Digit Code">
         <br>
         <button onclick="playVideo()">WATCH MOVIE</button>
         <video id="v" controls></video>
+        <p id="tv-status" style="color: #ff4444;"></p>
     </div>
 
     <script>
-        function showMobile() { document.getElementById('setup').style.display='none'; document.getElementById('mobile').style.display='block'; }
-        function showTV() { document.getElementById('setup').style.display='none'; document.getElementById('tv').style.display='block'; }
+        function showMobile() { document.getElementById('setup').classList.add('hidden'); document.getElementById('mobile').classList.remove('hidden'); }
+        function showTV() { document.getElementById('setup').classList.add('hidden'); document.getElementById('tv').classList.remove('hidden'); }
 
-        function uploadVideo() {
-            const file = document.getElementById('vid').files[0];
-            if (!file) return alert("Please select a video file first!");
+        async function sendLink() {
+            const url = document.getElementById('video-url').value.trim();
+            if (!url) return alert("Please paste a link first!");
 
-            const formData = new FormData();
-            formData.append('video', file);
+            document.getElementById('outCode').innerText = "Generating code...";
 
-            const progressBar = document.getElementById('progress-bar');
-            const progressContainer = document.getElementById('progress-container');
-            const statusText = document.getElementById('status-text');
-            const outCode = document.getElementById('outCode');
-
-            // Show the progress bar UI
-            progressContainer.style.display = 'block';
-            statusText.innerText = "Starting upload...";
-            outCode.innerText = "";
-
-            const xhr = new XMLHttpRequest();
-
-            // 1. Track Progress
-            xhr.upload.addEventListener("progress", function(event) {
-                if (event.lengthComputable) {
-                    const percentComplete = Math.round((event.loaded / event.total) * 100);
-                    progressBar.style.width = percentComplete + "%";
-                    statusText.innerText = `Uploading... ${percentComplete}%`;
-                }
+            const response = await fetch('/send-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: url })
             });
-
-            // 2. Upload Complete
-            xhr.addEventListener("load", function() {
-                if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
-                    statusText.innerText = "Upload Complete! Enter this code on the TV.";
-                    outCode.innerText = data.code;
-                    progressBar.style.background = "#00ff88"; // Turn green on success
-                } else {
-                    statusText.innerText = "Error uploading file. The file might be too large for Render.";
-                    progressBar.style.background = "#ff4444"; // Turn red on fail
-                }
-            });
-
-            // 3. Network Error
-            xhr.addEventListener("error", function() {
-                statusText.innerText = "Network Error! Check your connection.";
-                progressBar.style.background = "#ff4444";
-            });
-
-            // Send the request to your Render server
-            xhr.open("POST", "/upload");
-            xhr.send(formData);
+            
+            const data = await response.json();
+            document.getElementById('outCode').innerText = "TV CODE: " + data.code;
         }
 
-        function playVideo() {
+        async function playVideo() {
             const code = document.getElementById('inCode').value.trim();
-            if (!code) return alert("Please enter the code!");
+            const status = document.getElementById('tv-status');
+            status.innerText = "";
+
+            if (!code) return alert("Enter the code!");
+
+            const response = await fetch('/get-link/' + code);
             
-            const videoElement = document.getElementById('v');
-            videoElement.src = '/stream/' + code;
-            videoElement.play();
+            if (response.ok) {
+                const data = await response.json();
+                const videoElement = document.getElementById('v');
+                videoElement.src = data.url;
+                videoElement.play();
+            } else {
+                status.innerText = "Invalid code or link expired.";
+            }
         }
     </script>
 </body>
