@@ -11,10 +11,12 @@ const linkMap = new Map();
 function cleanDriveUrl(url) {
     if (url.includes('drive.google.com')) {
         const fileId = url.split('/d/')[1]?.split('/')[0];
+        // The '&confirm=t' tells Google to skip the virus warning
         if (fileId) return `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
     }
     return url;
 }
+
 
 app.post('/send-link', (req, res) => {
     const rawUrl = req.body.url;
