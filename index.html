@@ -2,75 +2,90 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TV Cast</title>
     <style>
         body { background:#121212; color:#fff; text-align:center; font-family:sans-serif; padding: 20px; }
-        button { padding:15px 20px; margin: 10px; font-size: 18px; background: #00d1ff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        input { padding: 15px; font-size: 16px; margin: 10px; width: 80%; max-width: 400px; text-align: center; border-radius: 5px; border: none; }
-        video { width: 100%; max-width: 800px; margin-top: 20px; border: 2px solid #333; background: #000; }
+        button { padding:15px; margin: 10px; font-size: 18px; background: #00d1ff; border: none; border-radius: 8px; cursor: pointer; width: 200px; }
+        input { padding: 15px; font-size: 16px; margin: 10px; width: 80%; max-width: 400px; border-radius: 5px; border: none; }
         .hidden { display: none; }
+        #v { width: 100%; max-width: 800px; margin-top: 20px; background: #000; }
     </style>
 </head>
 <body>
 
     <div id="setup">
-        <h1>Select Device</h1>
-        <button onclick="showMobile()">I AM MOBILE</button>
-        <button onclick="showTV()">I AM TV</button>
+        <h1>Select Mode</h1>
+        <button onclick="show('mobile')">MOBILE SENDER</button>
+        <button onclick="show('tv')">TV RECEIVER</button>
     </div>
 
     <div id="mobile" class="hidden">
-        <h2>Paste TeraBox Link</h2>
-        <input type="text" id="video-url" placeholder="https://terabox...">
+        <h2>Paste Video Link</h2>
+        <input type="text" id="video-url" placeholder="Paste Google Drive/Direct link here">
         <br>
-        <button onclick="sendLink()">CAST LINK</button>
-        <h1 id="outCode" style="color: #00ff88; font-size: 40px;"></h1>
+        <button id="sendBtn" onclick="sendLink()">GENERATE CODE</button>
+        <h1 id="outCode" style="color: #00ff88;"></h1>
     </div>
 
     <div id="tv" class="hidden">
-        <h2>Enter TV Code</h2>
+        <h2>Enter Code</h2>
         <input type="text" id="inCode" placeholder="4-Digit Code">
         <br>
-        <button onclick="playVideo()">WATCH MOVIE</button>
-        <video id="v" controls></video>
-        <p id="tv-status" style="color: #ff4444;"></p>
+        <button onclick="playVideo()">WATCH</button>
+        <p id="status"></p>
+        <video id="v" controls autoplay playsinline></video>
     </div>
 
     <script>
-        function showMobile() { document.getElementById('setup').classList.add('hidden'); document.getElementById('mobile').classList.remove('hidden'); }
-        function showTV() { document.getElementById('setup').classList.add('hidden'); document.getElementById('tv').classList.remove('hidden'); }
+        function show(id) {
+            document.getElementById('setup').classList.add('hidden');
+            document.getElementById(id).classList.remove('hidden');
+        }
 
         async function sendLink() {
-            const url = document.getElementById('video-url').value.trim();
-            if (!url) return alert("Please paste a link first!");
+            const urlInput = document.getElementById('video-url').value;
+            const btn = document.getElementById('sendBtn');
+            const out = document.getElementById('outCode');
 
-            document.getElementById('outCode').innerText = "Generating code...";
-
-            const response = await fetch('/send-link', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: url })
-            });
+            if (!urlInput) return alert("Paste a link!");
             
-            const data = await response.json();
-            document.getElementById('outCode').innerText = "TV CODE: " + data.code;
+            btn.innerText = "Loading...";
+            out.innerText = "";
+
+            try {
+                const res = await fetch('/send-link', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: urlInput })
+                });
+                const data = await res.json();
+                out.innerText = "CODE: " + data.code;
+            } catch (err) {
+                out.innerText = "Error: Server Sleeping. Refresh and try again.";
+            } finally {
+                btn.innerText = "GENERATE CODE";
+            }
         }
 
         async function playVideo() {
-            const code = document.getElementById('inCode').value.trim();
-            const status = document.getElementById('tv-status');
-            status.innerText = "";
+            const code = document.getElementById('inCode').value;
+            const status = document.getElementById('status');
+            const video = document.getElementById('v');
 
-            if (!code) return alert("Enter the code!");
-
-            const response = await fetch('/get-link/' + code);
-            
-            if (response.ok) {
-                const data = await response.json();
-                const videoElement = document.getElementById('v');
-                videoElement.src = data.url;
-                videoElement.play();
-            } else {
-                status.innerText = "Invalid code or link expired.";
+            status.innerText = "Fetching video...";
+            try {
+                const res = await fetch('/get-link/' + code);
+                const data = await res.json();
+                if (data.url) {
+                    video.src = data.url;
+                    video.load();
+                    video.play();
+                    status.innerText = "Playing!";
+                } else {
+                    status.innerText = "Invalid Code.";
+                }
+            } catch (err) {
+                status.innerText = "Error connecting to server.";
             }
         }
     </script>
