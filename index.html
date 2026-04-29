@@ -1,40 +1,112 @@
 <!DOCTYPE html>
 <html>
-<body style="background:#000; color:#fff; text-align:center; font-family:sans-serif;">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { background:#121212; color:#fff; text-align:center; font-family:sans-serif; padding: 20px; }
+        button { padding:15px 20px; margin: 10px; font-size: 18px; background: #00d1ff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        input { padding: 10px; font-size: 16px; margin: 10px; text-align: center; }
+        video { width: 100%; max-width: 800px; margin-top: 20px; border: 2px solid #333; }
+        
+        /* Progress Bar Styles */
+        #progress-container { display: none; width: 80%; margin: 20px auto; background: #333; border-radius: 10px; overflow: hidden; }
+        #progress-bar { width: 0%; height: 25px; background: #00d1ff; transition: width 0.2s; }
+        #status-text { margin-top: 10px; font-size: 16px; color: #aaa; }
+    </style>
+</head>
+<body>
 
     <div id="setup">
-        <button onclick="showMobile()" style="padding:20px;">I AM MOBILE</button>
-        <button onclick="showTV()" style="padding:20px;">I AM TV</button>
+        <h1>Select Device</h1>
+        <button onclick="showMobile()">I AM MOBILE</button>
+        <button onclick="showTV()">I AM TV</button>
     </div>
 
     <div id="mobile" style="display:none;">
-        <input type="file" id="vid">
-        <button onclick="upload()">UPLOAD & GET CODE</button>
-        <h2 id="outCode"></h2>
+        <h2>Sender</h2>
+        <input type="file" id="vid" accept="video/*">
+        <br>
+        <button onclick="uploadVideo()">UPLOAD & GET CODE</button>
+        
+        <div id="progress-container">
+            <div id="progress-bar"></div>
+        </div>
+        <p id="status-text"></p>
+        
+        <h1 id="outCode" style="color: #00d1ff; font-size: 40px;"></h1>
     </div>
 
     <div id="tv" style="display:none;">
-        <input type="text" id="inCode" placeholder="Enter Code">
-        <button onclick="play()">WATCH</button>
-        <video id="v" controls width="100%"></video>
+        <h2>Receiver</h2>
+        <input type="text" id="inCode" placeholder="Enter 4-Digit Code">
+        <br>
+        <button onclick="playVideo()">WATCH MOVIE</button>
+        <video id="v" controls></video>
     </div>
 
     <script>
         function showMobile() { document.getElementById('setup').style.display='none'; document.getElementById('mobile').style.display='block'; }
         function showTV() { document.getElementById('setup').style.display='none'; document.getElementById('tv').style.display='block'; }
 
-        async function upload() {
+        function uploadVideo() {
             const file = document.getElementById('vid').files[0];
+            if (!file) return alert("Please select a video file first!");
+
             const formData = new FormData();
             formData.append('video', file);
-            const res = await fetch('/upload', { method: 'POST', body: formData });
-            const data = await res.json();
-            document.getElementById('outCode').innerText = "TV CODE: " + data.code;
+
+            const progressBar = document.getElementById('progress-bar');
+            const progressContainer = document.getElementById('progress-container');
+            const statusText = document.getElementById('status-text');
+            const outCode = document.getElementById('outCode');
+
+            // Show the progress bar UI
+            progressContainer.style.display = 'block';
+            statusText.innerText = "Starting upload...";
+            outCode.innerText = "";
+
+            const xhr = new XMLHttpRequest();
+
+            // 1. Track Progress
+            xhr.upload.addEventListener("progress", function(event) {
+                if (event.lengthComputable) {
+                    const percentComplete = Math.round((event.loaded / event.total) * 100);
+                    progressBar.style.width = percentComplete + "%";
+                    statusText.innerText = `Uploading... ${percentComplete}%`;
+                }
+            });
+
+            // 2. Upload Complete
+            xhr.addEventListener("load", function() {
+                if (xhr.status === 200) {
+                    const data = JSON.parse(xhr.responseText);
+                    statusText.innerText = "Upload Complete! Enter this code on the TV.";
+                    outCode.innerText = data.code;
+                    progressBar.style.background = "#00ff88"; // Turn green on success
+                } else {
+                    statusText.innerText = "Error uploading file. The file might be too large for Render.";
+                    progressBar.style.background = "#ff4444"; // Turn red on fail
+                }
+            });
+
+            // 3. Network Error
+            xhr.addEventListener("error", function() {
+                statusText.innerText = "Network Error! Check your connection.";
+                progressBar.style.background = "#ff4444";
+            });
+
+            // Send the request to your Render server
+            xhr.open("POST", "/upload");
+            xhr.send(formData);
         }
 
-        function play() {
-            const code = document.getElementById('inCode').value;
-            document.getElementById('v').src = '/stream/' + code;
+        function playVideo() {
+            const code = document.getElementById('inCode').value.trim();
+            if (!code) return alert("Please enter the code!");
+            
+            const videoElement = document.getElementById('v');
+            videoElement.src = '/stream/' + code;
+            videoElement.play();
         }
     </script>
 </body>
